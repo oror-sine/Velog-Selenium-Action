@@ -6,13 +6,21 @@ from selenium.webdriver.support.wait import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from functools import partial
 from typing import Callable
+from jsonschema import Draft7Validator
 import clipboard
+import json
 
 # TODO: Read post information from JSON and validate its structure and data types
+# TODO: Read post information from the post
 # TODO: Refactor the module as a class
 # TODO: Implement file upload
 # - js in selenium 활용해서 drag & drop 구현
 # - pyvirtualdisplay, pyautogui 활용 gui 조작
+
+with open('post_schema.json', 'r', encoding='utf-8') as f:
+    post_schema = json.load(f)
+
+post_validator = Draft7Validator(schema=post_schema)
 
 
 def wait_find_element(driver, by, value, timeout=10):
@@ -141,6 +149,14 @@ def write_post(
     print('Successfully Generated:',driver.current_url)
 
 
+def write_post_from_json(driver, file_path):
+    with open(file_path, 'r', encoding='utf-8') as f:
+        post = {k:v for k,v in json.load(f).items() if v is not None}
+
+    post_validator.validate(post)
+    write_post(driver=driver, **post)
+
+
 def delete_post(
         driver:webdriver.Chrome,
         post_url:str|None = None,
@@ -174,6 +190,8 @@ if __name__ == '__main__':
     from datetime import datetime
     from get_driver import get_driver
     import sys
+    import re
+    import os
     
     _, username, password = (None, )*3
     
@@ -211,6 +229,15 @@ if __name__ == '__main__':
         'thumbnail':None
     }
 
-    write_post(driver, **post)
+    filename = re.sub(r'[\\/:*?"<>|]', '_', post["title"])
+    filepath = f'./posts/{filename}.json'
+    with open(filepath, 'w', encoding='utf-8') as f:
+        json.dump(post, f)
 
+    write_post(driver, **post)
     delete_post(driver, post_url=driver.current_url)
+    
+    write_post_from_json(driver, filepath)
+    delete_post(driver, post_url=driver.current_url)
+
+    os.remove(filepath)
