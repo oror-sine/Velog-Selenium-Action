@@ -8,7 +8,6 @@ from functools import partial
 from typing import Callable
 import clipboard
 
-# TODO: Implement post deletion
 # TODO: Read post information from JSON and validate its structure and data types
 # TODO: Refactor the module as a class
 # TODO: Implement file upload
@@ -21,6 +20,7 @@ def wait_find_element(driver, by, value, timeout=10):
         # EC.presence_of_element_located((by, value))
         EC.element_to_be_clickable((by, value))   
     )
+
 
 def clear_in_element(driver:webdriver.Chrome, by, value):
     wait_find_element(driver, by, value).click()
@@ -52,13 +52,16 @@ def login_by_github(
     XPATH(password_field).send_keys(password)
     XPATH(submit_button).click()
 
-    # Reauthorization required 처리
-    authorize_button = '/html/body/div[1]/div[6]/main/div/div[2]/div[1]/div[2]/div[1]/form/div/button[2]'
 
-    try:
-        XPATH(authorize_button, 2).click()    
-    except:
-        ...
+
+    # Reauthorization required 처리 
+    if (driver.current_url != 'https://velog.io/'):
+        try:
+            authorize_button = '/html/body/div[1]/div[6]/main/div/div[2]/div[1]/div[2]/div[1]/form/div/button[2]'
+            XPATH(authorize_button).click()    
+        except Exception as e:
+            raise Exception(e)
+
 
 def write_post(
         driver:webdriver.Chrome, 
@@ -130,17 +133,41 @@ def write_post(
     
     if thumbnail is not None:
         raise NotImplementedError()
-
+    
+    current_url = driver.current_url
     XPATH(submit_button).click()
+    WebDriverWait(driver, 10).until(EC.url_changes(current_url))
+    
+    print('Successfully Generated:',driver.current_url)
 
-    title_element = '//*[@id="root"]/div[2]/div[3]/div/h1'
-    print(XPATH(title_element).text)
-            
 
+def delete_post(
+        driver:webdriver.Chrome,
+        post_url:str|None = None,
+        user_name:str|None = None,
+        url_slug:str|None = None
+    ):
+    XPATH:Callable[[str],WebElement] = partial(wait_find_element, driver, By.XPATH)
+
+    if post_url is None:
+        post_url = f'https://velog.io/@{user_name}/{url_slug}'
+    
+    delete_button = '//*[@id="root"]/div[2]/div[3]/div/div[1]/button[3]'
+    submit_button = '//*[@id="root"]/div[2]/div[3]/div[3]/div/div/div[2]/button[2]'
+
+    driver.get(post_url)
+
+    try:
+        XPATH(delete_button).click()
+        XPATH(submit_button).click()
+    except Exception as e:
+        raise Exception(e)
+
+    print('Successfully Deleted:',driver.current_url)
+    
+    
 def edit_post():
     NotImplementedError()
-
-
 
 
 if __name__ == '__main__':
@@ -185,3 +212,5 @@ if __name__ == '__main__':
     }
 
     write_post(driver, **post)
+
+    delete_post(driver, post_url=driver.current_url)
